@@ -14,5 +14,5 @@ const (
 )
 
 func (nt Namespace) ForRegion(reg Region) string {
-	return fmt.Sprintf("%s-%s", nt, reg)
+	return fmt.Sprintf("%s-%s", nt, reg.String())
 }
