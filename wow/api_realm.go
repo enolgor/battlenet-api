@@ -7,7 +7,7 @@ import (
 )
 
 type Realm struct {
-	ID   int64                    `json:"id"`
+	ID   uint16                   `json:"id"`
 	Slug string                   `json:"slug"`
 	Name *blizzard.LocalizedField `json:"name"`
 }
@@ -20,7 +20,7 @@ type RealmExtended struct {
 	Timezone         string                   `json:"timezone"`
 	Type             *RealmType               `json:"type"`
 	IsTournament     bool                     `json:"is_tournament"`
-	ConnectedRealmID int64                    `json:"connected_realm_id"`
+	ConnectedRealmID uint16                   `json:"connected_realm_id"`
 }
 
 type RealmType struct {
@@ -29,7 +29,7 @@ type RealmType struct {
 }
 
 type RealmRegion struct {
-	ID   int64                    `json:"id"`
+	ID   blizzard.Region          `json:"id"`
 	Name *blizzard.LocalizedField `json:"name"`
 }
 
