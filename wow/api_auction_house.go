@@ -25,10 +25,10 @@ type Auction struct {
 }
 
 type auctionApi interface {
-	GetAuctions(connectedRealmID int64) ([]Auction, error)
+	GetAuctions(connectedRealmID uint16) ([]Auction, error)
 }
 
-func (wc *wowClientImpl) GetAuctions(connectedRealmID int64) ([]Auction, error) {
+func (wc *wowClientImpl) GetAuctions(connectedRealmID uint16) ([]Auction, error) {
 	auctionsResp := struct {
 		Auctions []Auction `json:"auctions"`
 	}{}
