@@ -65,6 +65,16 @@ func (wc *wowClientImpl) getGameData(path string, defaultNamespace blizzard.Name
 	return wc.battleNetClient.GetGameData(path, wc.context.locale, requestNamespace, receiver)
 }
 
+func (wc *wowClientImpl) searchGameData(path string, query battlenet.SearchQuery, defaultNamespace blizzard.Namespace, receiver interface{}) (*battlenet.SearchResult, error) {
+	var requestNamespace blizzard.Namespace
+	if wc.namespace == blizzard.NoNamespace {
+		requestNamespace = defaultNamespace
+	} else {
+		requestNamespace = wc.namespace
+	}
+	return wc.battleNetClient.SearchGameData(path, query, wc.context.locale, requestNamespace, receiver)
+}
+
 func (wc *wowClientImpl) Dynamic() DynamicAPI {
 	return wc.dynamic
 }

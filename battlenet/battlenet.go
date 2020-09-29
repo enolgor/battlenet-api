@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"time"
 
 	"github.com/enolgor/battlenet-api/blizzard"
@@ -18,7 +19,9 @@ type BattleNetClient interface {
 	SetRegion(region blizzard.Region)
 	GetAccessToken() (string, error)
 	NewGameDataRequest(path string, locale blizzard.Locale, namespace blizzard.Namespace) (*http.Request, error)
+	NewGameDataSearchRequest(path string, query SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace) (*http.Request, error)
 	GetGameData(path string, locale blizzard.Locale, namespace blizzard.Namespace, v interface{}) error
+	SearchGameData(path string, query SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace, v interface{}) (*SearchResult, error)
 }
 
 type battleNetClientImpl struct {
@@ -79,6 +82,7 @@ func (bnci *battleNetClientImpl) NewGameDataRequest(path string, locale blizzard
 	req := http.Request{}
 	req.URL = blizzard.NewAPIEndpoint(bnci.region)
 	req.URL.Path = path
+	req.Method = http.MethodGet
 	at, err := bnci.GetAccessToken()
 	if err != nil {
 		bnci.getLogger(ERROR).Print(err)
@@ -97,15 +101,18 @@ func (bnci *battleNetClientImpl) NewGameDataRequest(path string, locale blizzard
 	return &req, nil
 }
 
-func (bnci *battleNetClientImpl) GetGameData(path string, locale blizzard.Locale, namespace blizzard.Namespace, receiver interface{}) error {
-	var err error
-	var req *http.Request
-	var resp *http.Response
-	if req, err = bnci.NewGameDataRequest(path, locale, namespace); err != nil {
-		bnci.getLogger(ERROR).Print(err)
-		return err
+func (bnci *battleNetClientImpl) NewGameDataSearchRequest(path string, query SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace) (*http.Request, error) {
+	req, err := bnci.NewGameDataRequest(path, locale, namespace)
+	if err != nil {
+		return nil, err
 	}
-	req.Method = http.MethodGet
+	query.appendTo(req)
+	return req, nil
+}
+
+func (bnci *battleNetClientImpl) doGet(req *http.Request, receiver interface{}) error {
+	var resp *http.Response
+	var err error
 	curlReq, _ := http2curl.GetCurlCommand(req)
 	bnci.getLogger(INFO).Printf("REQ: %s\n", curlReq)
 	if resp, err = bnci.httpClient.Do(req); err != nil {
@@ -129,4 +136,47 @@ func (bnci *battleNetClientImpl) GetGameData(path string, locale blizzard.Locale
 		return err
 	}
 	return nil
+}
+
+func (bnci *battleNetClientImpl) GetGameData(path string, locale blizzard.Locale, namespace blizzard.Namespace, receiver interface{}) error {
+	var req *http.Request
+	var err error
+	if req, err = bnci.NewGameDataRequest(path, locale, namespace); err != nil {
+		bnci.getLogger(ERROR).Print(err)
+		return err
+	}
+	return bnci.doGet(req, receiver)
+}
+
+func (bnci *battleNetClientImpl) SearchGameData(path string, query SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace, receiver interface{}) (*SearchResult, error) {
+	var err error
+	var req *http.Request
+	if req, err = bnci.NewGameDataSearchRequest(path, query, locale, namespace); err != nil {
+		bnci.getLogger(ERROR).Print(err)
+		return nil, err
+	}
+	searchResult := struct {
+		SearchResult
+		Results json.RawMessage `json:"results"`
+	}{}
+	if err := bnci.doGet(req, &searchResult); err != nil {
+		return nil, err
+	}
+	searchResultData := []struct {
+		Data json.RawMessage `json:"data"`
+	}{}
+	if err = json.Unmarshal(searchResult.Results, &searchResultData); err != nil {
+		return nil, err
+	}
+	data := reflect.ValueOf(receiver).Elem()
+	objType := reflect.TypeOf(receiver).Elem().Elem()
+	for _, srd := range searchResultData {
+		elem := reflect.New(objType).Interface()
+		if err := json.Unmarshal(srd.Data, &elem); err != nil {
+			return nil, err
+		}
+		data = reflect.Append(data, reflect.ValueOf(elem).Elem())
+	}
+	reflect.ValueOf(receiver).Elem().Set(data)
+	return &searchResult.SearchResult, err
 }

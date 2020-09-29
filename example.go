@@ -15,6 +15,15 @@ func main() {
 	bnc.SetLogOutput(os.Stdout, battlenet.ERROR, battlenet.INFO)
 	wowclient := wow.NewWoWClient(bnc)
 	print(wowclient.GetAuctions(1403))
+
+	/*
+		wowclient := wow.NewWoWClient(bnc)
+		items, _, err := wowclient.SearchItem(battlenet.Query(battlenet.Params.OrderByDesc("id"), battlenet.Params.PageSize(1)))
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("%+v\n", items)
+	*/
 }
 
 func print(data interface{}, err error) {
