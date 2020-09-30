@@ -15,13 +15,29 @@ const (
 )
 
 type Auction struct {
-	ID        int64           `json:"id"`
-	Item      *Item           `json:"item"`
-	Quantity  int64           `json:"quantity"`   // quantity != 1 then unit_price != 0, buyout = 0, bid = 0
-	UnitPrice int64           `json:"unit_price"` // unit_price != 0 then quantity != 1
-	Buyout    int64           `json:"buyout"`     // buyout != 0 then quantity = 1
-	Bid       int64           `json:"bid"`        //bid != 0 then quantity = 1
-	TimeLeft  AuctionTimeLeft `json:"time_left"`
+	ID          uint64          `json:"id"`
+	AuctionItem *AuctionItem    `json:"item"`
+	Quantity    uint64          `json:"quantity"`   // quantity != 1 then unit_price != 0, buyout = 0, bid = 0
+	UnitPrice   uint64          `json:"unit_price"` // unit_price != 0 then quantity != 1
+	Buyout      uint64          `json:"buyout"`     // buyout != 0 then quantity = 1
+	Bid         uint64          `json:"bid"`        //bid != 0 then quantity = 1
+	TimeLeft    AuctionTimeLeft `json:"time_left"`
+}
+
+type AuctionItem struct {
+	ID           uint64                `json:"id"`
+	Context      uint8                 `json:"context"`
+	Modifiers    []AuctionItemModifier `json:"modifiers,omitempty"`
+	PetBreedID   *uint16               `json:"pet_breed_id,omitempty"`
+	PetLevel     *uint8                `json:"pet_level,omitempty"`
+	PetQualityID *uint8                `json:"pet_quality_id,omitempty"`
+	PetSpeciesID *uint64               `json:"pet_species_id,omitempty"`
+	BonusLists   []uint64              `json:"bonus_lists"`
+}
+
+type AuctionItemModifier struct {
+	Type  uint16 `json:"type"`
+	Value uint64 `json:"value"`
 }
 
 type auctionApi interface {
