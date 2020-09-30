@@ -4,7 +4,7 @@ import "github.com/enolgor/battlenet-api/blizzard"
 
 type Pet struct {
 	ID   uint64 `json:"id"`
-	Name *blizzard.LocalizedField
+	Name *blizzard.LocalizedField `json:"name"`
 }
 
 type PetExtended struct {
