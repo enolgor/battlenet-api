@@ -7,6 +7,21 @@ import (
 	"github.com/enolgor/battlenet-api/blizzard"
 )
 
+var AvailableLocales []blizzard.Locale = []blizzard.Locale{
+	blizzard.EnUS,
+	blizzard.EsMX,
+	blizzard.PtBR,
+	blizzard.EnGB,
+	blizzard.EsES,
+	blizzard.FrFR,
+	blizzard.RuRU,
+	blizzard.DeDE,
+	blizzard.ItIT,
+	blizzard.KoKR,
+	blizzard.ZhTW,
+	blizzard.ZhCN,
+}
+
 type WoWClient interface {
 	DynamicAPI
 	StaticAPI
