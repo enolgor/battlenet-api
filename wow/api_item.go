@@ -63,8 +63,8 @@ type Item struct {
 	IsEquippable  bool                     `json:"is_equippable"`
 	IsStackable   bool                     `json:"is_stackable"`
 	IsAzeriteItem *bool                    `json:"is_azerite_item,omitempty"` //just appears in the heart of azeroth item
-	Level         uint16                   `json:"level"`
-	RequiredLevel uint16                   `json:"required_level"`
+	Level         uint32                   `json:"level"`
+	RequiredLevel uint32                   `json:"required_level"`
 	InventoryType *struct {
 		Name *blizzard.LocalizedField `json:"name"`
 		Type *InventoryType           `json:"type"`
