@@ -1,7 +1,5 @@
 package blizzard
 
-import "net/url"
-
 type Region uint8
 
 const (
@@ -41,22 +39,6 @@ func (reg Region) Locales() []Locale {
 		return []Locale{ZhTW}
 	case CN:
 		return []Locale{ZhCN}
-	}
-	panic("Missing region in switch")
-}
-
-func (reg Region) oauthEndpoint() *url.URL {
-	switch reg {
-	case US:
-		return cloneURL(oauthEndpointUS)
-	case EU:
-		return cloneURL(oauthEndpointEU)
-	case KR:
-		return cloneURL(oauthEndpointKR)
-	case TW:
-		return cloneURL(oauthEndpointTW)
-	case CN:
-		return cloneURL(oauthEndpointCN)
 	}
 	panic("Missing region in switch")
 }

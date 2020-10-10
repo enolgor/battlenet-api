@@ -6,8 +6,7 @@ import (
 	"github.com/enolgor/battlenet-api/blizzard"
 )
 
-var oauthTokenEndpointUS, oauthTokenEndpointEU, oauthTokenEndpointKR, oauthTokenEndpointTW, oauthTokenEndpointCN *url.URL
-var oauthAuthorizeEndpointUS, oauthAuthorizeEndpointEU, oauthAuthorizeEndpointKR, oauthAuthorizeEndpointTW, oauthAuthorizeEndpointCN *url.URL
+var usEndpoint, euEndpoint, krEndpoint, twEndpoint, cnEndpoint *url.URL
 
 func init() {
 	mustParse := func(s string) (url *url.URL) {
@@ -18,17 +17,11 @@ func init() {
 		return
 	}
 
-	oauthTokenEndpointUS = mustParse("https://us.battle.net/oauth/token")
-	oauthTokenEndpointEU = mustParse("https://eu.battle.net/oauth/token")
-	oauthTokenEndpointKR = mustParse("https://kr.battle.net/oauth/token")
-	oauthTokenEndpointTW = mustParse("https://tw.battle.net/oauth/token")
-	oauthTokenEndpointCN = mustParse("https://www.battlenet.com.cn/oauth/token")
-
-	oauthAuthorizeEndpointUS = mustParse("https://us.battle.net/oauth/authorize")
-	oauthAuthorizeEndpointEU = mustParse("https://eu.battle.net/oauth/authorize")
-	oauthAuthorizeEndpointKR = mustParse("https://kr.battle.net/oauth/authorize")
-	oauthAuthorizeEndpointTW = mustParse("https://tw.battle.net/oauth/authorize")
-	oauthAuthorizeEndpointCN = mustParse("https://www.battlenet.com.cn/oauth/authorize")
+	usEndpoint = mustParse("https://us.battle.net")
+	euEndpoint = mustParse("https://eu.battle.net")
+	krEndpoint = mustParse("https://kr.battle.net")
+	twEndpoint = mustParse("https://tw.battle.net")
+	cnEndpoint = mustParse("https://www.battlenet.com.cn")
 }
 
 // from https://golang.org/src/net/http/clone.go?m=text
@@ -45,39 +38,29 @@ func cloneURL(u *url.URL) *url.URL {
 	return u2
 }
 
-func newOAuthTokenEndpoint(region blizzard.Region) *url.URL {
-	switch region {
-	case blizzard.US:
-		return cloneURL(oauthTokenEndpointUS)
-	case blizzard.EU:
-		return cloneURL(oauthTokenEndpointEU)
-	case blizzard.KR:
-		return cloneURL(oauthTokenEndpointKR)
-	case blizzard.TW:
-		return cloneURL(oauthTokenEndpointTW)
-	case blizzard.CN:
-		return cloneURL(oauthTokenEndpointCN)
-	}
-	panic("Missing region in switch")
-}
-
-func newOAuthAuthorizeEndpoint(region blizzard.Region) *url.URL {
-	switch region {
-	case blizzard.US:
-		return cloneURL(oauthAuthorizeEndpointUS)
-	case blizzard.EU:
-		return cloneURL(oauthAuthorizeEndpointEU)
-	case blizzard.KR:
-		return cloneURL(oauthAuthorizeEndpointKR)
-	case blizzard.TW:
-		return cloneURL(oauthAuthorizeEndpointTW)
-	case blizzard.CN:
-		return cloneURL(oauthAuthorizeEndpointCN)
-	}
-	panic("Missing region in switch")
-}
-
 const OAuthScopeWoWProfile string = "wow.profile"
 const OAuthScopeD3Profile string = "d3.profile"
 const OAuthScopeSC2Profile string = "sc2.profile"
 const OAuthScopeOpenID string = "openid"
+
+func NewEndpoint(region blizzard.Region, path string) *url.URL {
+	var endpoint *url.URL
+	switch region {
+	case blizzard.US:
+		endpoint = cloneURL(usEndpoint)
+	case blizzard.EU:
+		endpoint = cloneURL(euEndpoint)
+	case blizzard.KR:
+		endpoint = cloneURL(krEndpoint)
+	case blizzard.TW:
+		endpoint = cloneURL(twEndpoint)
+	case blizzard.CN:
+		endpoint = cloneURL(cnEndpoint)
+	default:
+		panic("Missing region in switch")
+	}
+	if path != "" {
+		endpoint.Path = path
+	}
+	return endpoint
+}

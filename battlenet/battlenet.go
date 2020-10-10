@@ -1,8 +1,6 @@
 package battlenet
 
 import (
-	"crypto/rand"
-	"encoding/base32"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,27 +19,42 @@ type BattleNetClient interface {
 	GetRegion() blizzard.Region
 	SetRegion(region blizzard.Region)
 	GetAccessToken() (string, error)
-	NewGameDataRequest(path string, locale blizzard.Locale, namespace blizzard.Namespace) (*http.Request, error)
-	NewGameDataSearchRequest(path string, query SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace) (*http.Request, error)
-	GetGameData(path string, locale blizzard.Locale, namespace blizzard.Namespace, v interface{}) error
-	SearchGameData(path string, query SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace, v interface{}) (*SearchResult, error)
-	GetAuthorizationURI(scopes ...string) (string, *url.URL, error)
+	NewBlizzardAPIRequest(path string, locale blizzard.Locale, namespace blizzard.Namespace, searchQuery SearchQuery, token string) (*http.Request, error)
+	NewBattleNetRequest(path string, token string) (*http.Request, error)
+	BlizzardAPIGet(path string, locale blizzard.Locale, namespace blizzard.Namespace, token string, v interface{}) error
+	BlizzardAPISearch(path string, query SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace, token string, v interface{}) (*SearchResult, error)
+	BattleNetGet(path string, token string, v interface{}) error
+	GetAuthorizationURI(redirectURI string, scopes ...string) (*url.URL, error)
+	ParseAuthorizationResponse(req *http.Request) (string, error)
+	GetAuthorizationToken(code string, redirectURI string, scopes ...string) (string, *time.Time, error)
+	UserInfo(token string) (*UserInfo, error)
+}
+
+type UserInfo struct {
+	Sub       string `json:"sub"`
+	ID        uint64 `json:"id"`
+	BattleTag string `json:"battletag"`
 }
 
 type battleNetClientImpl struct {
 	battlenetLogger
-	region       blizzard.Region
-	clientID     string
-	clientSecret string
-	accessToken  string
-	expiration   time.Time
-	httpClient   *http.Client
+	region        blizzard.Region
+	clientID      string
+	clientSecret  string
+	accessToken   string
+	expiration    time.Time
+	httpClient    *http.Client
+	oAuthStateGen *oAuthStateGen
 }
 
-func NewBattleNetClient(region blizzard.Region, clientID string, clientSecret string) BattleNetClient {
-	bnc := &battleNetClientImpl{region: region, clientID: clientID, clientSecret: clientSecret, httpClient: &http.Client{}}
+func NewBattleNetClient(region blizzard.Region, clientID string, clientSecret string) (BattleNetClient, error) {
+	oAuthStateGen, err := newOAuthStateGen(clientID, clientSecret)
+	if err != nil {
+		return nil, err
+	}
+	bnc := &battleNetClientImpl{region: region, clientID: clientID, clientSecret: clientSecret, httpClient: &http.Client{}, oAuthStateGen: oAuthStateGen}
 	bnc.battlenetLogger = newBattleNetLogger()
-	return bnc
+	return bnc, nil
 }
 
 func (bnci *battleNetClientImpl) SetRegion(region blizzard.Region) {
@@ -50,15 +63,12 @@ func (bnci *battleNetClientImpl) SetRegion(region blizzard.Region) {
 }
 
 func (bnci *battleNetClientImpl) GetAccessToken() (string, error) {
-	if bnci.clientSecret == "" {
-		return "", fmt.Errorf("Must specify client secret first")
-	}
 	if bnci.accessToken == "" || bnci.expiration.Before(time.Now()) {
 		respStruct := struct {
 			AccessToken string `json:"access_token"`
 			ExpiresIn   int64  `json:"expires_in"`
 		}{}
-		ep := newOAuthTokenEndpoint(bnci.region)
+		ep := NewEndpoint(bnci.region, "/oauth/token")
 		ep.User = url.UserPassword(bnci.clientID, bnci.clientSecret)
 		response, err := http.PostForm(ep.String(), url.Values{
 			"grant_type": {"client_credentials"},
@@ -78,40 +88,89 @@ func (bnci *battleNetClientImpl) GetAccessToken() (string, error) {
 	return bnci.accessToken, nil
 }
 
-func (bnci *battleNetClientImpl) GetAuthorizationURI(scopes ...string) (string, *url.URL, error) {
-	randBytes := make([]byte, 20)
-	if _, err := rand.Read(randBytes); err != nil {
-		return "", nil, err
-	}
-	randStr := base32.StdEncoding.EncodeToString(randBytes)
-	ep := newOAuthAuthorizeEndpoint(bnci.region)
+func (bnci *battleNetClientImpl) GetAuthorizationURI(redirectURI string, scopes ...string) (*url.URL, error) {
+	state := bnci.oAuthStateGen.generate()
+	ep := NewEndpoint(bnci.region, "/oauth/authorize")
 	scopeStr := strings.Join(scopes, " ")
 	values := ep.Query()
 	values.Add("client_id", bnci.clientID)
 	values.Add("scope", scopeStr)
-	values.Add("state", randStr)
-	values.Add("redirect_uri", "https://localhost")
+	values.Add("state", state)
+	values.Add("redirect_uri", redirectURI)
 	values.Add("response_type", "code")
 	ep.RawQuery = values.Encode()
-	return randStr, ep, nil
+	return ep, nil
+}
+
+func (bnci *battleNetClientImpl) ParseAuthorizationResponse(req *http.Request) (string, error) {
+	state := req.URL.Query().Get("state")
+	if state == "" {
+		return "", fmt.Errorf("Missing state value in request query")
+	}
+	code := req.URL.Query().Get("code")
+	if code == "" {
+		return "", fmt.Errorf("Missing code value in request query")
+	}
+	ok, err := bnci.oAuthStateGen.parse(state)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", fmt.Errorf("State does not match with client")
+	}
+	return code, nil
+}
+
+func (bnci *battleNetClientImpl) GetAuthorizationToken(code string, redirectURI string, scopes ...string) (string, *time.Time, error) {
+	scopeStr := strings.Join(scopes, " ")
+	if bnci.clientSecret == "" {
+		return "", nil, fmt.Errorf("Must specify client secret first")
+	}
+	respStruct := struct {
+		AccessToken string `json:"access_token"`
+		ExpiresIn   int64  `json:"expires_in"`
+	}{}
+	ep := NewEndpoint(bnci.region, "/oauth/token")
+	ep.User = url.UserPassword(bnci.clientID, bnci.clientSecret)
+	response, err := http.PostForm(ep.String(), url.Values{
+		"redirect_uri": {redirectURI},
+		"scope":        {scopeStr},
+		"grant_type":   {"authorization_code"},
+		"code":         {code},
+	})
+	if err != nil {
+		return "", nil, err
+	}
+	defer response.Body.Close()
+	dec := json.NewDecoder(response.Body)
+	if err = dec.Decode(&respStruct); err != nil {
+		return "", nil, err
+	}
+	expiration := time.Now().Add(time.Second * time.Duration(respStruct.ExpiresIn))
+	return respStruct.AccessToken, &expiration, nil
 }
 
 func (bnci *battleNetClientImpl) GetRegion() blizzard.Region {
 	return bnci.region
 }
 
-func (bnci *battleNetClientImpl) NewGameDataRequest(path string, locale blizzard.Locale, namespace blizzard.Namespace) (*http.Request, error) {
-	req := http.Request{}
+func (bnci *battleNetClientImpl) NewBattleNetRequest(path string, token string) (*http.Request, error) {
+	req := &http.Request{}
+	req.URL = NewEndpoint(bnci.region, path)
+	req.URL.Path = path
+	req.Method = http.MethodGet
+	req.Header = make(http.Header)
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	return req, nil
+}
+
+func (bnci *battleNetClientImpl) NewBlizzardAPIRequest(path string, locale blizzard.Locale, namespace blizzard.Namespace, searchQuery SearchQuery, token string) (*http.Request, error) {
+	req := &http.Request{}
 	req.URL = blizzard.NewAPIEndpoint(bnci.region)
 	req.URL.Path = path
 	req.Method = http.MethodGet
-	at, err := bnci.GetAccessToken()
-	if err != nil {
-		bnci.getLogger(ERROR).Print(err)
-		return nil, err
-	}
 	req.Header = make(http.Header)
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", at))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	if namespace != blizzard.NoNamespace {
 		req.Header.Add("Battlenet-Namespace", namespace.ForRegion(bnci.region))
 	}
@@ -120,15 +179,9 @@ func (bnci *battleNetClientImpl) NewGameDataRequest(path string, locale blizzard
 		query.Add("locale", string(locale))
 		req.URL.RawQuery = query.Encode()
 	}
-	return &req, nil
-}
-
-func (bnci *battleNetClientImpl) NewGameDataSearchRequest(path string, query SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace) (*http.Request, error) {
-	req, err := bnci.NewGameDataRequest(path, locale, namespace)
-	if err != nil {
-		return nil, err
+	if searchQuery != nil {
+		searchQuery.appendTo(req)
 	}
-	query.appendTo(req)
 	return req, nil
 }
 
@@ -160,20 +213,20 @@ func (bnci *battleNetClientImpl) doGet(req *http.Request, receiver interface{}) 
 	return nil
 }
 
-func (bnci *battleNetClientImpl) GetGameData(path string, locale blizzard.Locale, namespace blizzard.Namespace, receiver interface{}) error {
+func (bnci *battleNetClientImpl) BlizzardAPIGet(path string, locale blizzard.Locale, namespace blizzard.Namespace, token string, receiver interface{}) error {
 	var req *http.Request
 	var err error
-	if req, err = bnci.NewGameDataRequest(path, locale, namespace); err != nil {
+	if req, err = bnci.NewBlizzardAPIRequest(path, locale, namespace, nil, token); err != nil {
 		bnci.getLogger(ERROR).Print(err)
 		return err
 	}
 	return bnci.doGet(req, receiver)
 }
 
-func (bnci *battleNetClientImpl) SearchGameData(path string, query SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace, receiver interface{}) (*SearchResult, error) {
+func (bnci *battleNetClientImpl) BlizzardAPISearch(path string, query SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace, token string, receiver interface{}) (*SearchResult, error) {
 	var err error
 	var req *http.Request
-	if req, err = bnci.NewGameDataSearchRequest(path, query, locale, namespace); err != nil {
+	if req, err = bnci.NewBlizzardAPIRequest(path, locale, namespace, query, token); err != nil {
 		bnci.getLogger(ERROR).Print(err)
 		return nil, err
 	}
@@ -201,4 +254,22 @@ func (bnci *battleNetClientImpl) SearchGameData(path string, query SearchQuery, 
 	}
 	reflect.ValueOf(receiver).Elem().Set(data)
 	return &searchResult.SearchResult, err
+}
+
+func (bnci *battleNetClientImpl) BattleNetGet(path string, token string, receiver interface{}) error {
+	var req *http.Request
+	var err error
+	if req, err = bnci.NewBattleNetRequest(path, token); err != nil {
+		bnci.getLogger(ERROR).Print(err)
+		return err
+	}
+	return bnci.doGet(req, receiver)
+}
+
+func (bnci *battleNetClientImpl) UserInfo(token string) (*UserInfo, error) {
+	userInfo := &UserInfo{}
+	if err := bnci.BattleNetGet("/oauth/userinfo", token, userInfo); err != nil {
+		return nil, err
+	}
+	return userInfo, nil
 }

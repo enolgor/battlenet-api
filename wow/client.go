@@ -77,7 +77,11 @@ func (wc *wowClientImpl) getGameData(path string, defaultNamespace blizzard.Name
 	} else {
 		requestNamespace = wc.namespace
 	}
-	return wc.battleNetClient.GetGameData(path, wc.context.locale, requestNamespace, receiver)
+	token, err := wc.battleNetClient.GetAccessToken()
+	if err != nil {
+		return err
+	}
+	return wc.battleNetClient.BlizzardAPIGet(path, wc.context.locale, requestNamespace, token, receiver)
 }
 
 func (wc *wowClientImpl) searchGameData(path string, query battlenet.SearchQuery, defaultNamespace blizzard.Namespace, receiver interface{}) (*battlenet.SearchResult, error) {
@@ -87,7 +91,15 @@ func (wc *wowClientImpl) searchGameData(path string, query battlenet.SearchQuery
 	} else {
 		requestNamespace = wc.namespace
 	}
-	return wc.battleNetClient.SearchGameData(path, query, wc.context.locale, requestNamespace, receiver)
+	token, err := wc.battleNetClient.GetAccessToken()
+	if err != nil {
+		return nil, err
+	}
+	return wc.battleNetClient.BlizzardAPISearch(path, query, wc.context.locale, requestNamespace, token, receiver)
+}
+
+func (wc *wowClientImpl) getProfileData(path string, token string, receiver interface{}) error {
+	return wc.battleNetClient.BlizzardAPIGet(path, wc.context.locale, blizzard.Profile, token, receiver)
 }
 
 func (wc *wowClientImpl) Dynamic() DynamicAPI {
