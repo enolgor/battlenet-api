@@ -1,12 +1,15 @@
 package battlenet
 
 import (
+	"crypto/rand"
+	"encoding/base32"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/enolgor/battlenet-api/blizzard"
@@ -22,6 +25,7 @@ type BattleNetClient interface {
 	NewGameDataSearchRequest(path string, query SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace) (*http.Request, error)
 	GetGameData(path string, locale blizzard.Locale, namespace blizzard.Namespace, v interface{}) error
 	SearchGameData(path string, query SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace, v interface{}) (*SearchResult, error)
+	GetAuthorizationURI(scopes ...string) (string, *url.URL, error)
 }
 
 type battleNetClientImpl struct {
@@ -54,7 +58,7 @@ func (bnci *battleNetClientImpl) GetAccessToken() (string, error) {
 			AccessToken string `json:"access_token"`
 			ExpiresIn   int64  `json:"expires_in"`
 		}{}
-		ep := newOAUTHEndpoint(bnci.region)
+		ep := newOAuthTokenEndpoint(bnci.region)
 		ep.User = url.UserPassword(bnci.clientID, bnci.clientSecret)
 		response, err := http.PostForm(ep.String(), url.Values{
 			"grant_type": {"client_credentials"},
@@ -72,6 +76,24 @@ func (bnci *battleNetClientImpl) GetAccessToken() (string, error) {
 		return bnci.accessToken, nil
 	}
 	return bnci.accessToken, nil
+}
+
+func (bnci *battleNetClientImpl) GetAuthorizationURI(scopes ...string) (string, *url.URL, error) {
+	randBytes := make([]byte, 20)
+	if _, err := rand.Read(randBytes); err != nil {
+		return "", nil, err
+	}
+	randStr := base32.StdEncoding.EncodeToString(randBytes)
+	ep := newOAuthAuthorizeEndpoint(bnci.region)
+	scopeStr := strings.Join(scopes, " ")
+	values := ep.Query()
+	values.Add("client_id", bnci.clientID)
+	values.Add("scope", scopeStr)
+	values.Add("state", randStr)
+	values.Add("redirect_uri", "https://localhost")
+	values.Add("response_type", "code")
+	ep.RawQuery = values.Encode()
+	return randStr, ep, nil
 }
 
 func (bnci *battleNetClientImpl) GetRegion() blizzard.Region {
