@@ -3,7 +3,6 @@ package wow
 import (
 	"fmt"
 
-	"github.com/enolgor/battlenet-api/battlenet"
 	"github.com/enolgor/battlenet-api/blizzard"
 )
 
@@ -105,7 +104,7 @@ type AzeritePower struct {
 
 type itemApi interface {
 	GetItem(id uint64) (*Item, error)
-	SearchItem(query battlenet.SearchQuery) ([]Item, *battlenet.SearchResult, error)
+	SearchItem(query blizzard.SearchQuery) ([]Item, *blizzard.SearchResult, error)
 }
 
 func (wc *wowClientImpl) GetItem(id uint64) (*Item, error) {
@@ -114,7 +113,7 @@ func (wc *wowClientImpl) GetItem(id uint64) (*Item, error) {
 	return item, err
 }
 
-func (wc *wowClientImpl) SearchItem(query battlenet.SearchQuery) ([]Item, *battlenet.SearchResult, error) {
+func (wc *wowClientImpl) SearchItem(query blizzard.SearchQuery) ([]Item, *blizzard.SearchResult, error) {
 	items := []Item{}
 	searchResult, err := wc.searchGameData("/data/wow/search/item", query, blizzard.Static, &items)
 	if err != nil {

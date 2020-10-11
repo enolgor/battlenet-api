@@ -26,90 +26,37 @@ type WoWClient interface {
 	DynamicAPI
 	StaticAPI
 	ProfileAPI
-	SetLocale(locale blizzard.Locale) error
-	Dynamic() DynamicAPI
-	Static() StaticAPI
-	Profile() ProfileAPI
-}
-
-type context struct {
-	locale blizzard.Locale
 }
 
 type wowClientImpl struct {
 	battleNetClient battlenet.BattleNetClient
-	namespace       blizzard.Namespace
-	context         *context
-	static          *wowClientImpl
-	dynamic         *wowClientImpl
-	profile         *wowClientImpl
+	locale          blizzard.Locale
 }
 
-//var currentLocale blizzard.Locale = blizzard.NoLocale
-
-func NewWoWClient(battlenetClient battlenet.BattleNetClient) WoWClient {
-	context := &context{locale: blizzard.NoLocale}
-	defaultWowClient := &wowClientImpl{battleNetClient: battlenetClient, context: context, namespace: blizzard.NoNamespace}
-	staticClient := *defaultWowClient
-	dynamicClient := *defaultWowClient
-	profileClient := *defaultWowClient
-	staticClient.namespace = blizzard.Static
-	dynamicClient.namespace = blizzard.Dynamic
-	profileClient.namespace = blizzard.Profile
-	defaultWowClient.static = &staticClient
-	defaultWowClient.dynamic = &dynamicClient
-	defaultWowClient.profile = &profileClient
-	return defaultWowClient
-}
-
-func (wc *wowClientImpl) SetLocale(locale blizzard.Locale) error {
+func NewWoWClient(battlenetClient battlenet.BattleNetClient, locale blizzard.Locale) (WoWClient, error) {
 	if locale == blizzard.PtPT {
-		return fmt.Errorf("Unsupported locale")
+		return nil, fmt.Errorf("Unsupported locale")
 	}
-	wc.context.locale = locale
-	return nil
+	defaultWowClient := &wowClientImpl{battleNetClient: battlenetClient}
+	return defaultWowClient, nil
 }
 
-func (wc *wowClientImpl) getGameData(path string, defaultNamespace blizzard.Namespace, receiver interface{}) error {
-	var requestNamespace blizzard.Namespace
-	if wc.namespace == blizzard.NoNamespace {
-		requestNamespace = defaultNamespace
-	} else {
-		requestNamespace = wc.namespace
-	}
+func (wc *wowClientImpl) getGameData(path string, namespace blizzard.Namespace, receiver interface{}) error {
 	token, err := wc.battleNetClient.GetAccessToken()
 	if err != nil {
 		return err
 	}
-	return wc.battleNetClient.BlizzardAPIGet(path, wc.context.locale, requestNamespace, token, receiver)
+	return wc.battleNetClient.BlizzardAPIGet(path, wc.locale, namespace, token, receiver)
 }
 
-func (wc *wowClientImpl) searchGameData(path string, query battlenet.SearchQuery, defaultNamespace blizzard.Namespace, receiver interface{}) (*battlenet.SearchResult, error) {
-	var requestNamespace blizzard.Namespace
-	if wc.namespace == blizzard.NoNamespace {
-		requestNamespace = defaultNamespace
-	} else {
-		requestNamespace = wc.namespace
-	}
+func (wc *wowClientImpl) searchGameData(path string, query blizzard.SearchQuery, namespace blizzard.Namespace, receiver interface{}) (*blizzard.SearchResult, error) {
 	token, err := wc.battleNetClient.GetAccessToken()
 	if err != nil {
 		return nil, err
 	}
-	return wc.battleNetClient.BlizzardAPISearch(path, query, wc.context.locale, requestNamespace, token, receiver)
+	return wc.battleNetClient.BlizzardAPISearch(path, query, wc.locale, namespace, token, receiver)
 }
 
 func (wc *wowClientImpl) getProfileData(path string, token string, receiver interface{}) error {
-	return wc.battleNetClient.BlizzardAPIGet(path, wc.context.locale, blizzard.Profile, token, receiver)
-}
-
-func (wc *wowClientImpl) Dynamic() DynamicAPI {
-	return wc.dynamic
-}
-
-func (wc *wowClientImpl) Static() StaticAPI {
-	return wc.static
-}
-
-func (wc *wowClientImpl) Profile() ProfileAPI {
-	return wc.profile
+	return wc.battleNetClient.BlizzardAPIGet(path, wc.locale, blizzard.Profile, token, receiver)
 }

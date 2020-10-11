@@ -16,13 +16,11 @@ import (
 
 type BattleNetClient interface {
 	battlenetLogger
-	GetRegion() blizzard.Region
-	SetRegion(region blizzard.Region)
 	GetAccessToken() (string, error)
-	NewBlizzardAPIRequest(path string, locale blizzard.Locale, namespace blizzard.Namespace, searchQuery SearchQuery, token string) (*http.Request, error)
+	NewBlizzardAPIRequest(path string, locale blizzard.Locale, namespace blizzard.Namespace, searchQuery blizzard.SearchQuery, token string) (*http.Request, error)
 	NewBattleNetRequest(path string, token string) (*http.Request, error)
 	BlizzardAPIGet(path string, locale blizzard.Locale, namespace blizzard.Namespace, token string, v interface{}) error
-	BlizzardAPISearch(path string, query SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace, token string, v interface{}) (*SearchResult, error)
+	BlizzardAPISearch(path string, query blizzard.SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace, token string, v interface{}) (*blizzard.SearchResult, error)
 	BattleNetGet(path string, token string, v interface{}) error
 	GetAuthorizationURI(redirectURI string, scopes ...string) (*url.URL, error)
 	ParseAuthorizationResponse(req *http.Request) (string, error)
@@ -55,11 +53,6 @@ func NewBattleNetClient(region blizzard.Region, clientID string, clientSecret st
 	bnc := &battleNetClientImpl{region: region, clientID: clientID, clientSecret: clientSecret, httpClient: &http.Client{}, oAuthStateGen: oAuthStateGen}
 	bnc.battlenetLogger = newBattleNetLogger()
 	return bnc, nil
-}
-
-func (bnci *battleNetClientImpl) SetRegion(region blizzard.Region) {
-	bnci.region = region
-	bnci.accessToken = ""
 }
 
 func (bnci *battleNetClientImpl) GetAccessToken() (string, error) {
@@ -150,10 +143,6 @@ func (bnci *battleNetClientImpl) GetAuthorizationToken(code string, redirectURI 
 	return respStruct.AccessToken, &expiration, nil
 }
 
-func (bnci *battleNetClientImpl) GetRegion() blizzard.Region {
-	return bnci.region
-}
-
 func (bnci *battleNetClientImpl) NewBattleNetRequest(path string, token string) (*http.Request, error) {
 	req := &http.Request{}
 	req.URL = NewEndpoint(bnci.region, path)
@@ -164,7 +153,7 @@ func (bnci *battleNetClientImpl) NewBattleNetRequest(path string, token string) 
 	return req, nil
 }
 
-func (bnci *battleNetClientImpl) NewBlizzardAPIRequest(path string, locale blizzard.Locale, namespace blizzard.Namespace, searchQuery SearchQuery, token string) (*http.Request, error) {
+func (bnci *battleNetClientImpl) NewBlizzardAPIRequest(path string, locale blizzard.Locale, namespace blizzard.Namespace, searchQuery blizzard.SearchQuery, token string) (*http.Request, error) {
 	req := &http.Request{}
 	req.URL = blizzard.NewAPIEndpoint(bnci.region)
 	req.URL.Path = path
@@ -180,7 +169,7 @@ func (bnci *battleNetClientImpl) NewBlizzardAPIRequest(path string, locale blizz
 		req.URL.RawQuery = query.Encode()
 	}
 	if searchQuery != nil {
-		searchQuery.appendTo(req)
+		searchQuery.AddToRequest(req)
 	}
 	return req, nil
 }
@@ -223,7 +212,7 @@ func (bnci *battleNetClientImpl) BlizzardAPIGet(path string, locale blizzard.Loc
 	return bnci.doGet(req, receiver)
 }
 
-func (bnci *battleNetClientImpl) BlizzardAPISearch(path string, query SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace, token string, receiver interface{}) (*SearchResult, error) {
+func (bnci *battleNetClientImpl) BlizzardAPISearch(path string, query blizzard.SearchQuery, locale blizzard.Locale, namespace blizzard.Namespace, token string, receiver interface{}) (*blizzard.SearchResult, error) {
 	var err error
 	var req *http.Request
 	if req, err = bnci.NewBlizzardAPIRequest(path, locale, namespace, query, token); err != nil {
@@ -231,7 +220,7 @@ func (bnci *battleNetClientImpl) BlizzardAPISearch(path string, query SearchQuer
 		return nil, err
 	}
 	searchResult := struct {
-		SearchResult
+		blizzard.SearchResult
 		Results json.RawMessage `json:"results"`
 	}{}
 	if err := bnci.doGet(req, &searchResult); err != nil {

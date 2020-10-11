@@ -1,4 +1,4 @@
-package battlenet
+package blizzard
 
 import (
 	"fmt"
@@ -63,7 +63,7 @@ var Params = struct {
 	},
 }
 
-func (sq SearchQuery) appendTo(req *http.Request) {
+func (sq SearchQuery) AddToRequest(req *http.Request) {
 	q := req.URL.Query()
 	for _, query := range sq {
 		q.Add(query[0], query[1])
