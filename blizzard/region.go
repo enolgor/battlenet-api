@@ -27,6 +27,23 @@ func (reg Region) String() string {
 	panic("Missing region in switch")
 }
 
+func GetRegion(regionStr string) Region {
+	switch regionStr {
+	case "us":
+		return US
+	case "eu":
+		return EU
+	case "kr":
+		return KR
+	case "tw":
+		return TW
+	case "cn":
+		return CN
+	default:
+		return NoRegion
+	}
+}
+
 func (reg Region) Locales() []Locale {
 	switch reg {
 	case US:
