@@ -38,6 +38,7 @@ func NewWoWClient(battlenetClient battlenet.BattleNetClient, locale blizzard.Loc
 		return nil, fmt.Errorf("Unsupported locale")
 	}
 	defaultWowClient := &wowClientImpl{battleNetClient: battlenetClient}
+	defaultWowClient.locale = locale
 	return defaultWowClient, nil
 }
 

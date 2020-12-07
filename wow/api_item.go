@@ -57,13 +57,17 @@ type ItemMedia struct {
 }
 
 type Item struct {
-	ID            uint64                   `json:"id"`
-	Name          *blizzard.LocalizedField `json:"name"`
-	IsEquippable  bool                     `json:"is_equippable"`
-	IsStackable   bool                     `json:"is_stackable"`
-	IsAzeriteItem *bool                    `json:"is_azerite_item,omitempty"` //just appears in the heart of azeroth item
-	Level         uint32                   `json:"level"`
-	RequiredLevel uint32                   `json:"required_level"`
+	ID   uint64                   `json:"id"`
+	Name *blizzard.LocalizedField `json:"name"`
+}
+
+type ItemExtended struct {
+	Item
+	IsEquippable  bool   `json:"is_equippable"`
+	IsStackable   bool   `json:"is_stackable"`
+	IsAzeriteItem *bool  `json:"is_azerite_item,omitempty"` //just appears in the heart of azeroth item
+	Level         uint32 `json:"level"`
+	RequiredLevel uint32 `json:"required_level"`
 	InventoryType *struct {
 		Name *blizzard.LocalizedField `json:"name"`
 		Type *InventoryType           `json:"type"`
@@ -103,18 +107,18 @@ type AzeritePower struct {
 }
 
 type itemApi interface {
-	GetItem(id uint64) (*Item, error)
-	SearchItem(query blizzard.SearchQuery) ([]Item, *blizzard.SearchResult, error)
+	GetItem(id uint64) (*ItemExtended, error)
+	SearchItem(query blizzard.SearchQuery) ([]ItemExtended, *blizzard.SearchResult, error)
 }
 
-func (wc *wowClientImpl) GetItem(id uint64) (*Item, error) {
-	item := &Item{}
+func (wc *wowClientImpl) GetItem(id uint64) (*ItemExtended, error) {
+	item := &ItemExtended{}
 	err := wc.getGameData(fmt.Sprintf("/data/wow/item/%d", id), blizzard.Static, item)
 	return item, err
 }
 
-func (wc *wowClientImpl) SearchItem(query blizzard.SearchQuery) ([]Item, *blizzard.SearchResult, error) {
-	items := []Item{}
+func (wc *wowClientImpl) SearchItem(query blizzard.SearchQuery) ([]ItemExtended, *blizzard.SearchResult, error) {
+	items := []ItemExtended{}
 	searchResult, err := wc.searchGameData("/data/wow/search/item", query, blizzard.Static, &items)
 	if err != nil {
 		return nil, nil, err
