@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
-	"time"
 
 	"github.com/enolgor/battlenet-api/battlenet"
 	"github.com/enolgor/battlenet-api/blizzard"
@@ -18,8 +16,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	bnc.SetLogOutput(os.Stdout, battlenet.ERROR, battlenet.INFO)
-	wowclient, err := wow.NewWoWClient(bnc, blizzard.NoLocale)
+	//bnc.SetLogger(log.New(os.Stdout, "", log.LstdFlags), battlenet.ERROR, battlenet.INFO, battlenet.DEBUG)
+	/*wowclient, err := wow.NewWoWClient(bnc, blizzard.NoLocale)
 	if err != nil {
 		panic(err)
 	}
@@ -60,19 +58,29 @@ func main() {
 		w.Write([]byte("\n"))
 		encoder.Encode(profile)
 	})
-	log.Fatal(http.ListenAndServeTLS(":8123", "server.crt", "server.key", nil))
+	log.Fatal(http.ListenAndServeTLS(":8123", "server.crt", "server.key", nil))*/
 
 	//wowclient := wow.NewWoWClient(bnc, blizzard.EnUS)
 	//print(wowclient.GetAuctions(1403))
 
-	/*
-		wowclient := wow.NewWoWClient(bnc, blizzard.EsES)
-		items, _, err := wowclient.SearchItem(battlenet.Query(battlenet.Params.OrderByDesc("id"), battlenet.Params.PageSize(1)))
-		if err != nil {
-			log.Fatal(err)
+	wowclient, err := wow.NewWoWClient(bnc, blizzard.EsES)
+	if err != nil {
+		log.Fatal(err)
+	}
+	skillTier, err := wowclient.GetSkillTier(164, 2751)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, cat := range skillTier.Categories {
+		for _, rec := range cat.Recipes {
+			recipe, err := wowclient.GetRecipe(rec.ID)
+			if err != nil {
+				log.Fatal(err)
+			}
+			fmt.Println(recipe)
 		}
-		fmt.Printf("%+v\n", items)
-	*/
+	}
+
 }
 
 func print(data interface{}, err error) {
