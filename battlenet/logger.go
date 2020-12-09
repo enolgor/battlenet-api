@@ -64,32 +64,30 @@ type bncLoggerImpl struct {
 }
 
 func (bli *bncLoggerImpl) Print(v ...interface{}) {
-	if bli.internal == nil {
-		return
-	}
-	prefix := bli.internal.Prefix()
-	bli.internal.SetPrefix(fmt.Sprintf("[%s]", bli.level))
-	bli.internal.Print(v...)
-	bli.internal.SetPrefix(prefix)
+	bli.safeLog(func() {
+		bli.internal.Print(v...)
+	})
 }
 
 func (bli *bncLoggerImpl) Printf(format string, v ...interface{}) {
-	if bli.internal == nil {
-		return
-	}
-	prefix := bli.internal.Prefix()
-	bli.internal.SetPrefix(fmt.Sprintf("[%s]", bli.level))
-	bli.internal.Printf(format, v...)
-	bli.internal.SetPrefix(prefix)
+	bli.safeLog(func() {
+		bli.internal.Printf(format, v...)
+	})
 }
 
 func (bli *bncLoggerImpl) Println(v ...interface{}) {
+	bli.safeLog(func() {
+		bli.internal.Println(v...)
+	})
+}
+
+func (bli *bncLoggerImpl) safeLog(f func()) {
 	if bli.internal == nil {
 		return
 	}
 	prefix := bli.internal.Prefix()
-	bli.internal.SetPrefix(fmt.Sprintf("[%s]", bli.level))
-	bli.internal.Println(v...)
+	bli.internal.SetPrefix(fmt.Sprintf("[BattleNet] [%s] ", bli.level))
+	f()
 	bli.internal.SetPrefix(prefix)
 }
 

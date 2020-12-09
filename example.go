@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	bnc, err := battlenet.NewBattleNetClient(blizzard.EU, "client_id", "client_secret")
+	bnc, err := battlenet.NewBattleNetClient(blizzard.EU, "d3f2dca7d84b473e9e0b57eda3ece312", "nvOdUZZ7Bf4DBVBiBSqr84GPAJ6O9Ega")
 	if err != nil {
 		panic(err)
 	}
